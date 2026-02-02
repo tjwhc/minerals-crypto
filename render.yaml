@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: minerals-crypto-dashboard
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: minerals-crypto-db
+          property: connectionString
+
+databases:
+  - name: minerals-crypto-db
+    plan: free
+    databaseName: minerals_crypto
+    user: minerals_crypto

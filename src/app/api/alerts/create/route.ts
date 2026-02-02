@@ -5,7 +5,7 @@ import { sendEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
   const token = req.headers.get("cookie")?.match(/session=([^;]+)/)?.[1] || "";
-  const user = getSessionUser(token) as any;
+  const user = (await getSessionUser(token)) as any;
   if (!user || user.subscription_status !== "active") {
     return NextResponse.json({ error: "Pro required" }, { status: 403 });
   }
@@ -15,9 +15,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  db.prepare(
-    "INSERT INTO alerts (user_id, code, condition, threshold, email, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(user.id, code, condition, threshold, email, Date.now());
+  await db.query(
+    "INSERT INTO alerts (user_id, code, condition, threshold, email, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+    [user.id, code, condition, threshold, email, Date.now()]
+  );
 
   await sendEmail({
     to: email,

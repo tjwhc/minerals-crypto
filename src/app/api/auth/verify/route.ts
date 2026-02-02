@@ -6,9 +6,10 @@ export async function GET(req: Request) {
   const token = searchParams.get("token");
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
-  const user = db.prepare("SELECT id FROM users WHERE verification_token = ?").get(token) as any;
+  const userRes = await db.query("SELECT id FROM users WHERE verification_token = $1", [token]);
+  const user = userRes.rows[0] as any;
   if (!user) return NextResponse.json({ error: "Invalid token" }, { status: 400 });
 
-  db.prepare("UPDATE users SET verified = 1, verification_token = NULL WHERE id = ?").run(user.id);
+  await db.query("UPDATE users SET verified = TRUE, verification_token = NULL WHERE id = $1", [user.id]);
   return NextResponse.redirect("/pricing");
 }

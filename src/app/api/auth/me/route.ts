@@ -3,7 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 
 export async function GET(req: Request) {
   const token = req.headers.get("cookie")?.match(/session=([^;]+)/)?.[1] || "";
-  const user = getSessionUser(token) as any;
+  const user = (await getSessionUser(token)) as any;
   if (!user) return NextResponse.json({ user: null });
 
   return NextResponse.json({

@@ -4,23 +4,27 @@ import bcrypt from "bcryptjs";
 
 const SESSION_DAYS = 7;
 
-export const createSession = (userId: number) => {
+export const createSession = async (userId: number) => {
   const token = crypto.randomBytes(24).toString("hex");
   const expiresAt = Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000;
-  const stmt = db.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)");
-  stmt.run(token, userId, expiresAt);
+  await db.query("INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, $3)", [
+    token,
+    userId,
+    expiresAt,
+  ]);
   return { token, expiresAt };
 };
 
-export const getSessionUser = (token: string) => {
+export const getSessionUser = async (token: string) => {
   if (!token) return null;
-  const session = db.prepare("SELECT user_id, expires_at FROM sessions WHERE token = ?").get(token) as
-    | { user_id: number; expires_at: number }
-    | undefined;
+  const sessionRes = await db.query("SELECT user_id, expires_at FROM sessions WHERE token = $1", [
+    token,
+  ]);
+  const session = sessionRes.rows[0] as { user_id: number; expires_at: number } | undefined;
   if (!session) return null;
   if (session.expires_at < Date.now()) return null;
-  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(session.user_id);
-  return user || null;
+  const userRes = await db.query("SELECT * FROM users WHERE id = $1", [session.user_id]);
+  return userRes.rows[0] || null;
 };
 
 export const hashPassword = async (password: string) => {

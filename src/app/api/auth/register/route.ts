@@ -9,8 +9,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing email or password" }, { status: 400 });
   }
 
-  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
-  if (existing) {
+  const existingRes = await db.query("SELECT id FROM users WHERE email = $1", [email]);
+  if (existingRes.rows[0]) {
     return NextResponse.json({ error: "Email already registered" }, { status: 400 });
   }
 
@@ -18,13 +18,13 @@ export async function POST(req: Request) {
   const token = createVerificationToken();
   const createdAt = Date.now();
 
-  const stmt = db.prepare(
-    "INSERT INTO users (email, password_hash, verified, verification_token, created_at) VALUES (?, ?, 0, ?, ?)"
+  const insertRes = await db.query(
+    "INSERT INTO users (email, password_hash, verified, verification_token, created_at) VALUES ($1, $2, FALSE, $3, $4) RETURNING id",
+    [email, passwordHash, token, createdAt]
   );
-  const result = stmt.run(email, passwordHash, token, createdAt);
-  const userId = result.lastInsertRowid as number;
+  const userId = insertRes.rows[0]?.id as number;
 
-  const { token: sessionToken, expiresAt } = createSession(userId);
+  const { token: sessionToken, expiresAt } = await createSession(userId);
 
   const verifyUrl = `${process.env.APP_URL || "https://mineralscrypto.onrender.com"}/api/auth/verify?token=${token}`;
   await sendEmail({

@@ -55,7 +55,7 @@ const fetchStooqPrices = async () => {
   const rows = html.match(rowRegex) || [];
 
   rows.forEach((row) => {
-    const symbolMatch = row.match(/<a href=q\/\?s=([^>]+)>([^<]+)<\/a>/i);
+    const symbolMatch = row.match(/<a href=q\/?s=([^>]+)>([^<]+)<\/a>/i);
     const lastMatch = row.match(/_c\d+>([0-9.,]+)<\/span>/i);
     if (!symbolMatch || !lastMatch) return;
     const symbol = symbolMatch[2].toUpperCase();
@@ -70,20 +70,30 @@ const fetchStooqPrices = async () => {
   return rates;
 };
 
-const storeSnapshot = (rates: Record<string, number>) => {
+const storeSnapshot = async (rates: Record<string, number>) => {
   const ts = Date.now();
   const day = toDayString(ts);
-  const insert = db.prepare("INSERT INTO metal_prices (code, price_usd, ts) VALUES (?, ?, ?)");
-  const insertDaily = db.prepare(
-    "INSERT OR IGNORE INTO metal_prices_daily (code, price_usd, day) VALUES (?, ?, ?)"
-  );
-  const tx = db.transaction(() => {
-    Object.entries(rates).forEach(([code, price]) => {
-      insert.run(code, price, ts);
-      insertDaily.run(code, price, day);
-    });
-  });
-  tx();
+  const client = await db.getClient();
+  try {
+    await client.query("BEGIN");
+    for (const [code, price] of Object.entries(rates)) {
+      await client.query("INSERT INTO metal_prices (code, price_usd, ts) VALUES ($1, $2, $3)", [
+        code,
+        price,
+        ts,
+      ]);
+      await client.query(
+        "INSERT INTO metal_prices_daily (code, price_usd, day) VALUES ($1, $2, $3) ON CONFLICT (code, day) DO NOTHING",
+        [code, price, day]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 const ensureScheduler = () => {
@@ -93,7 +103,7 @@ const ensureScheduler = () => {
     try {
       const rates = await fetchStooqPrices();
       if (Object.keys(rates).length) {
-        storeSnapshot(rates);
+        await storeSnapshot(rates);
       }
     } catch {
       // ignore
@@ -119,59 +129,58 @@ export async function GET() {
   try {
     rates = await fetchStooqPrices();
     if (Object.keys(rates).length) {
-      storeSnapshot(rates);
+      await storeSnapshot(rates);
     }
   } catch {
     // ignore
   }
 
-  const history1dStmt = db.prepare(
-    "SELECT price_usd FROM metal_prices WHERE code = ? AND ts >= ? ORDER BY ts ASC"
-  );
-  const history7dStmt = db.prepare(
-    "SELECT price_usd FROM metal_prices_daily WHERE code = ? ORDER BY day DESC LIMIT 7"
-  );
+  const metals = await Promise.all(
+    METALS_LIST.map(async (item) => {
+      const direct = rates[item.code];
+      const history1dRes = await db.query(
+        "SELECT price_usd FROM metal_prices WHERE code = $1 AND ts >= $2 ORDER BY ts ASC",
+        [item.code, now - 24 * 60 * 60 * 1000]
+      );
+      const history7dRes = await db.query(
+        "SELECT price_usd FROM metal_prices_daily WHERE code = $1 ORDER BY day DESC LIMIT 7",
+        [item.code]
+      );
+      const sparkline1d = history1dRes.rows.map((r) => r.price_usd).slice(-MAX_POINTS);
+      const sparkline7d = history7dRes.rows.map((r) => r.price_usd).reverse();
 
-  const metals = METALS_LIST.map((item) => {
-    const direct = rates[item.code];
-    const history1dRows = history1dStmt.all(item.code, now - 24 * 60 * 60 * 1000) as Array<{
-      price_usd: number;
-    }>;
-    const history7dRows = history7dStmt.all(item.code) as Array<{ price_usd: number }>;
-    const sparkline1d = history1dRows.map((r) => r.price_usd).slice(-MAX_POINTS);
-    const sparkline7d = history7dRows.map((r) => r.price_usd).reverse();
-
-    if (!direct) {
+      if (!direct) {
+        return {
+          name: item.name,
+          code: item.code,
+          priceUsd: null,
+          status: "source_pending",
+          sparkline1d,
+          sparkline7d,
+        };
+      }
       return {
         name: item.name,
         code: item.code,
-        priceUsd: null,
-        status: "source_pending",
+        priceUsd: direct,
+        status: "ok",
         sparkline1d,
         sparkline7d,
       };
-    }
-    return {
-      name: item.name,
-      code: item.code,
-      priceUsd: direct,
-      status: "ok",
-      sparkline1d,
-      sparkline7d,
-    };
-  });
+    })
+  );
 
   // fire alerts
   try {
-    const alerts = db.prepare("SELECT * FROM alerts").all() as any[];
-    for (const alert of alerts) {
+    const alertsRes = await db.query("SELECT * FROM alerts");
+    for (const alert of alertsRes.rows as any[]) {
       const price = rates[alert.code];
       if (!price) continue;
       const triggered =
         (alert.condition === "above" && price > alert.threshold) ||
         (alert.condition === "below" && price < alert.threshold);
       if (triggered && (!alert.last_triggered || Date.now() - alert.last_triggered > 60 * 60 * 1000)) {
-        db.prepare("UPDATE alerts SET last_triggered = ? WHERE id = ?").run(Date.now(), alert.id);
+        await db.query("UPDATE alerts SET last_triggered = $1 WHERE id = $2", [Date.now(), alert.id]);
         await sendEmail({
           to: alert.email,
           subject: `Alert triggered: ${alert.code}`,

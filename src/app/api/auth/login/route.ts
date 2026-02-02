@@ -8,7 +8,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing email or password" }, { status: 400 });
   }
 
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
+  const userRes = await db.query("SELECT * FROM users WHERE email = $1", [email]);
+  const user = userRes.rows[0] as any;
   if (!user) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  const { token, expiresAt } = createSession(user.id);
+  const { token, expiresAt } = await createSession(user.id);
   const res = NextResponse.json({ ok: true });
   res.cookies.set("session", token, {
     httpOnly: true,

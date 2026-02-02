@@ -8,7 +8,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", { apiVersion: "20
 export async function POST(req: Request) {
   const { plan } = await req.json();
   const token = req.headers.get("cookie")?.match(/session=([^;]+)/)?.[1] || "";
-  const user = getSessionUser(token) as any;
+  const user = (await getSessionUser(token)) as any;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   if (plan === "student" && !String(user.email).endsWith(".edu")) {
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   if (!customerId) {
     const customer = await stripe.customers.create({ email: user.email });
     customerId = customer.id;
-    db.prepare("UPDATE users SET stripe_customer_id = ? WHERE id = ?").run(customerId, user.id);
+    await db.query("UPDATE users SET stripe_customer_id = $1 WHERE id = $2", [customerId, user.id]);
   }
 
   const session = await stripe.checkout.sessions.create({
