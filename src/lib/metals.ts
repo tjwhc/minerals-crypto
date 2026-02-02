@@ -3,6 +3,7 @@ export type MetalItem = {
   code: string;
   unit?: string;
   pending?: boolean;
+  stooqSymbol?: string;
 };
 
 export const METALS_LIST: MetalItem[] = [
@@ -16,26 +17,10 @@ export const METALS_LIST: MetalItem[] = [
   { name: "Zinc", code: "ZNC" },
   { name: "Tin", code: "TIN" },
   { name: "Lead", code: "LEAD" },
-  { name: "Iron", code: "FE" },
-  { name: "Steel", code: "STEEL" },
-  { name: "Lithium", code: "LI" },
-  { name: "Cobalt", code: "CO" },
-  { name: "Manganese", code: "MN" },
-  { name: "Chromium", code: "CR" },
-  { name: "Molybdenum", code: "MO" },
-  { name: "Titanium", code: "TI" },
-  { name: "Magnesium", code: "MG" },
-  { name: "Tungsten", code: "W" },
-  { name: "Vanadium", code: "V" },
-  { name: "Silicon", code: "SI" },
-  { name: "Graphite", code: "C" },
-  { name: "Rare Earths (Index)", code: "RE" },
-  { name: "Gallium", code: "GA" },
-  { name: "Germanium", code: "GE" },
-  { name: "Indium", code: "IN" },
-  { name: "Antimony", code: "SB" },
-  { name: "Bismuth", code: "BI" },
-  { name: "Cadmium", code: "CD" }
+  { name: "Iron Ore", code: "FE" },
+  { name: "Steel (Scrap)", code: "STEEL" },
+  { name: "Cobalt", code: "CO" }
 ];
 
 export const METALS_CODES = METALS_LIST.map((item) => item.code);
+export const METALS_STOOQ = METALS_LIST.filter((item) => item.stooqSymbol);
