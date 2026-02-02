@@ -4,16 +4,26 @@ import { useState } from "react";
 
 export default function PricingPage() {
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const startCheckout = async (plan: "pro" | "student") => {
     setLoading(plan);
+    setError(null);
     const res = await fetch("/api/stripe/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ plan }),
     });
     const json = await res.json();
-    if (json?.url) window.location.href = json.url;
+    if (res.status === 401) {
+      window.location.href = "/login";
+      return;
+    }
+    if (json?.url) {
+      window.location.href = json.url;
+      return;
+    }
+    setError(json?.error || "Unable to start checkout");
     setLoading(null);
   };
   return (
@@ -27,6 +37,11 @@ export default function PricingPage() {
           </p>
         </header>
 
+        {error && (
+          <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+            {error}
+          </div>
+        )}
         <div className="grid gap-6 md:grid-cols-3">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
             <h2 className="text-lg font-semibold">Free</h2>
