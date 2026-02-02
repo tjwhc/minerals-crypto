@@ -79,6 +79,7 @@ export default function PricingPage() {
           <h3 className="text-base font-semibold text-white">Notes</h3>
           <ul className="mt-3 space-y-2">
             <li>Free plan stays available with ad‑supported access.</li>
+            <li>Pro and Student plans are completely ad‑free.</li>
             <li>Student pricing is valid while your .edu email remains active.</li>
             <li>Affiliate or broker links may appear later as sponsored placements.</li>
           </ul>
