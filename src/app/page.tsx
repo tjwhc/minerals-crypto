@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MetalHistoryChart from "@/components/MetalHistoryChart";
-import Adsense from "@/components/Adsense";
+import AdsenseGate from "@/components/AdsenseGate";
 
 type MetalRow = {
   name: string;
@@ -35,7 +35,6 @@ export default function Home() {
   const [data, setData] = useState<ApiPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [selectedCryptoId, setSelectedCryptoId] = useState<string>("");
   const [usdAmount, setUsdAmount] = useState<string>("1");
   const [modalOpen, setModalOpen] = useState(false);
@@ -64,10 +63,6 @@ export default function Home() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetch("/api/auth/me").then(r=>r.json()).then(d=>setUser(d.user));
-  }, []);
 
   useEffect(() => {
     loadData();
@@ -246,9 +241,7 @@ export default function Home() {
           </div>
         </header>
 
-        {(!user || user?.subscription_status !== "active") && (
-          <Adsense slot={process.env.NEXT_PUBLIC_ADSENSE_TOP || ""} className="my-6" />
-        )}
+        <AdsenseGate slot={process.env.NEXT_PUBLIC_ADSENSE_TOP || ""} className="my-6" />
 
         <section className="mt-8 grid gap-6 md:grid-cols-[2fr_1fr]">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
@@ -437,9 +430,7 @@ export default function Home() {
           </div>
         </section>
 
-        {(!user || user?.subscription_status !== "active") && (
-          <Adsense slot={process.env.NEXT_PUBLIC_ADSENSE_MID || ""} className="my-6" />
-        )}
+        <AdsenseGate slot={process.env.NEXT_PUBLIC_ADSENSE_MID || ""} className="my-6" />
 
         <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-zinc-400">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -489,6 +480,8 @@ export default function Home() {
                 7D
               </button>
             </div>
+            <AdsenseGate slot={process.env.NEXT_PUBLIC_ADSENSE_MID || ""} className="mt-4" />
+
             <div className="mt-4">
               {modalLoading ? (
                 <div className="h-48 w-full rounded bg-white/5" />
