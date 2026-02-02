@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 import Stripe from "stripe";
 import { getSessionUser } from "@/lib/auth";
 import db from "@/lib/db";

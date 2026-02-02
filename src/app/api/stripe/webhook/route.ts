@@ -1,4 +1,7 @@
 import Stripe from "stripe";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 import db from "@/lib/db";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", { apiVersion: "2026-01-28.clover" });
