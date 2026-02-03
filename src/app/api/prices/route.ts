@@ -138,18 +138,28 @@ export async function GET() {
   const metals = await Promise.all(
     METALS_LIST.map(async (item) => {
       const direct = rates[item.code];
-      const history1dRes = await db.query(
-        "SELECT price_usd FROM metal_prices WHERE code = $1 AND ts >= $2 ORDER BY ts ASC",
-        [item.code, now - 24 * 60 * 60 * 1000]
-      );
-      const history7dRes = await db.query(
-        "SELECT price_usd FROM metal_prices_daily WHERE code = $1 ORDER BY day DESC LIMIT 7",
-        [item.code]
-      );
-      const sparkline1d = history1dRes.rows.map((r) => r.price_usd).slice(-MAX_POINTS);
-      const sparkline7d = history7dRes.rows.map((r) => r.price_usd).reverse();
+      let sparkline1d: number[] = [];
+      let sparkline7d: number[] = [];
+      let latestFromDb: number | null = null;
 
-      if (!direct) {
+      try {
+        const history1dRes = await db.query(
+          "SELECT price_usd FROM metal_prices WHERE code = $1 AND ts >= $2 ORDER BY ts ASC",
+          [item.code, now - 24 * 60 * 60 * 1000]
+        );
+        const history7dRes = await db.query(
+          "SELECT price_usd FROM metal_prices_daily WHERE code = $1 ORDER BY day DESC LIMIT 7",
+          [item.code]
+        );
+        sparkline1d = history1dRes.rows.map((r) => r.price_usd).slice(-MAX_POINTS);
+        sparkline7d = history7dRes.rows.map((r) => r.price_usd).reverse();
+        latestFromDb = history1dRes.rows.at(-1)?.price_usd ?? history7dRes.rows[0]?.price_usd ?? null;
+      } catch {
+        // DB unavailable; fall back to live source only.
+      }
+
+      const priceUsd = direct ?? latestFromDb ?? null;
+      if (!priceUsd) {
         return {
           name: item.name,
           code: item.code,
@@ -162,7 +172,7 @@ export async function GET() {
       return {
         name: item.name,
         code: item.code,
-        priceUsd: direct,
+        priceUsd,
         status: "ok",
         sparkline1d,
         sparkline7d,
